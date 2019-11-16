@@ -14,10 +14,10 @@ if (!require(data.table)) installed.packages("data.table", repos="http://cran.us
 # http://files.grouplens.org/datasets/movielens/ml-10m.zip
 
 dl <- tempfile()
-#download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
-download.file("file://d:/WorkSpace/DataScience/DataSets/ml-10m.zip", dl)
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+dl
 
-ratings <- file.read(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
                  col.names = c("userId", "movieId", "rating", "timestamp"))
 
 movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
@@ -75,4 +75,3 @@ edx %>% separate_rows(genres, sep = "\\|") %>% group_by(genres) %>% summarize(co
 edx %>% group_by(movieId, title) %>% summarize(count=n()) %>% arrange(desc(count))
 edx %>% group_by(rating) %>% summarize(count=n()) %>% arrange(desc(count))
 
-edx[,c(1:10)]
