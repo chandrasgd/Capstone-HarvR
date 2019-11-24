@@ -106,47 +106,52 @@ uniqueGenres
 
 #gather(edx, key="userId", "movieId", value="rating", -title, -genres, -timestamp)
 
-# model fitting
+# model fitting ################################################
 # Y(u,i) = mu + b(i) + b(u) + e(u,i)
-# avg rating for all movies and all users
+# global avg rating for all movies and all users
 mu <- mean(edx$rating)
 naive_RMSE <- RMSE(validation$rating, mu)
 rmse_results <- data_frame(method="Naive", RMSE=naive_RMSE)
 
-# observe effect of the movie bias
+# observe effect of the Movie bias  #########################################
 movie_avg <- edx %>% group_by (movieId) %>% summarize(b_i=mean(rating-mu))
 
 # histogram to show the movie bias to the no of ratings
 hist(movie_avg$b_i)
 
 # prediction with movie bias over the average rating
-y_movie <- mu + validation %>% left_join(movie_avg, by="movieId") %>% .$b_i
+y_movie <- validation %>% 
+  left_join(movie_avg, by="movieId") %>% 
+  mutate(pred = mu + b_i) %>% 
+  .$pred
 model_1_rmse <- RMSE(y_movie, validation$rating)
 
 rmse_results <- bind_rows(rmse_results, data_frame(method="Model-1", RMSE=model_1_rmse))  
 rmse_results %>% knitr::kable()
 
-# observe effect of the user bias when user rated more than 100 movies
-user_avg <- edx %>% group_by(userId) %>% summarize(mean_u = mean(rating), n=n())
-#user_avg <- user_avg %>% filter(n>100)
+# observe effect of the User bias  #########################################
+user_avg <- edx %>% group_by(userId) %>% summarize(b_u = mean(rating - mu), n=n())
+# filter when user rated more than 100 movies
+user_avg_100 <- user_avg %>% filter(n>100)
 
 # histogram to show the movie bias to the no of ratings
-hist(user_avg$mean_u )
+hist(user_avg$b_u )
+hist(user_avg_100$b_u )
 
-# user bias on the rating
-user_avg <- edx %>% 
+# residual user bias on the rating
+blend1_avg <- edx %>% 
   left_join(movie_avg, by="movieId") %>% 
   group_by(userId) %>% 
   summarize(b_u = mean(rating - mu - b_i))
 
-# prediction with movie bias over the average rating
-y_user <- validation %>% 
+# prediction with movie bias and user bias over the average rating
+blend1_rating <- validation %>% 
   left_join(movie_avg, by="movieId") %>% 
-  left_join(user_avg, by="userId") %>%
+  left_join(blend1_avg, by="userId") %>%
   mutate(pred=mu + b_i + b_u) %>% 
   .$pred
 
-model_2_rmse <- RMSE(y_user, validation$rating)
+model_2_rmse <- RMSE(blend1_rating, validation$rating)
 
 rmse_results <- bind_rows(rmse_results, data_frame(method="Model-2", RMSE=model_2_rmse))
 rmse_results %>% knitr::kable()
@@ -215,4 +220,30 @@ model_3_rmse <- RMSE(y_movie_reg, validation$rating)
 rmse_results <- bind_rows(rmse_results, data_frame(method="Model-M-Reg", RMSE=model_3_rmse))
 rmse_results %>% knitr::kable()
 
+# blended prediction with regularized movie bias 
+blend2_rating <- validation %>% 
+  left_join(movie_reg_avg, by="movieId") %>% 
+  left_join(blend1_avg, by="userId") %>%
+  mutate(pred=mu + b_i + b_u) %>% 
+  .$pred
+
+model_4_rmse <- RMSE(blend2_rating, validation$rating)
+
+rmse_results <- bind_rows(rmse_results, data_frame(method="Model-Blend-Reg-Mov", RMSE=model_4_rmse))
+rmse_results %>% knitr::kable()
+
+# regularization on the user bias
+lambda <- 3
+user_reg_avg <- edx %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - mu)/(lambda + n()), n_u = n())
+
+y_user_reg <- validation %>%
+  left_join(user_reg_avg, by="userId") %>%
+  mutate(pred = mu + b_u) %>%
+  .$pred
+
+model_5_rmse <- RMSE(y_user_reg, validation$rating)
+
+plot(user_avg$b_u, user_reg_avg$b_u)
 
